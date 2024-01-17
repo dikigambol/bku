@@ -9,7 +9,9 @@
             <div class="card-body">
                 <h5>Upload RKAK/L</h5>
                 <div class="my-2">
-                    <button class="btn-import btn btn-sm btn-warning" role="button" data-bs-toggle="modal" data-bs-target="#mdlImport"><i class="fa fa-upload mr-1" aria-hidden="true"></i> Import</button>
+                    <button class="btn-import btn btn-sm btn-warning" role="button" data-bs-toggle="modal" data-bs-target="#mdlImport" onclick="removeKdDokumen()">
+                        <i class="fa fa-upload mr-1" aria-hidden="true"></i> Import
+                    </button>
                 </div>
             </div>
         </div>
@@ -32,10 +34,26 @@
                             <p class="my-0">Diupload Oleh : {{$im->fullname}}</p>
                         </div>
                     </div>
-                    <div class="col-xl-6 col-md-4 col-xs-12">
+                    <div class="col-xl-6 col-md-4 col-xs-12 pb-3">
                         <div class="mx-2">
                             <div>
-                                <button class="btn btn-secondary m-1" data-id="{{$im->id}}" data-act="show" id="btnShowRk"><i class="fa fa-eye mr-1"></i> Preview</button>
+                                @if ($im->kd_dokumen_count == 7)
+                                <button class="btn btn-secondary m-1" data-id="{{$im->id}}" data-act="show" id="btnShowRk">
+                                    <i class="fa fa-eye mr-1"></i> Preview
+                                </button>
+                                @else
+                                <p>
+                                    Lengkapi hingga 7 files dengan jenis yang berbeda, untuk melakukan preview lengkap.
+                                    Anda juga dapat melakukan update file dengan memilih jenis yang ingin di update, lalu
+                                    masukkan file yang baru.
+                                    <br>
+                                    Jumlah File masuk saat ini dan jenisnya : <b>{{$im->kd_dokumen_count}} Files, ({{$im->jenis_files}})</b>
+                                </p>
+                                <button class="btn btn-warning" role="button" data-bs-toggle="modal" data-bs-target="#mdlImport" onclick="fillKdDokumen('{{$im->kd_dokumen}}', '{{$im->kd_satker}}', '{{$im->thang}}')">
+                                    <i class="fa fa-plus mr-1"></i> Tambah File
+                                </button>
+                                @endif
+
                                 @if (Auth::user()->role != 3)
                                 <button class="btn btn-primary m-1 d-none" id="btnEditRk" data-id="{{$im->id}}" data-bs-toggle="modal" data-bs-target="#mdlUpdate"><i class="fa fa-pen mr-1"></i> Update</button>
                                 @endif
@@ -48,18 +66,9 @@
                     </div>
                 </div>
             </div>
-            <!-- <div class="card-body">
-                <p>Detail Perubahan</p>
-                <?php $jumlah = $cont->getRkakl($im->id); ?>
-                <p class="my-0">Jumlah Data : {{$jumlah}}</p>
-                @if ($im->id != 1)
-                <?php $sebelum = $cont->getRkakl($im->id - 1);
-                $selisih = $jumlah - $sebelum; ?>
-                @if (isset($sebelum) && $selisih > 0)
-                <p class="my-0">Penambahan Data : {{$selisih}}</p>
-                @endif
-                @endif
-            </div> -->
+            <?php $jumlah = $cont->getRkakl($im->id); ?>
+            <?php $sebelum = $cont->getRkakl($im->id - 1);
+            $selisih = $jumlah - $sebelum; ?>
         </div>
         @endforeach
         @endif
@@ -74,12 +83,24 @@
                 <form action="{{ route('import') }}" id="form-import" method="post" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-body">
+                        <input type="hidden" id="kd_dokumen">
+                        <div class="form-group">
+                            <label for="">Jenis File</label>
+                            <select class="form-select" name="jenis" id="jenis" required>
+                                <option value="">- pilih -</option>
+                                <option value="program">Program</option>
+                                <option value="kegiatan">Kegiatan</option>
+                                <option value="suboutput">Suboutput</option>
+                                <option value="komponen">Komponen</option>
+                                <option value="subkomponen">Sukomponen</option>
+                                <option value="akun">Akun</option>
+                                <option value="uraian">Uraian</option>
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label for="">File Excel Rkakl</label>
                             <br>
-                            <div id="fileList"></div>
-                            <input type="file" id="fileInput" style="display: none" multiple>
-                            <button type="button" onclick="selectFile()" class="btn btn-outline-info">Add File</button>
+                            <input type="file" id="fileInput">
                         </div>
                         <div class="form-group">
                             <label for="">Satuan Kerja</label>
@@ -90,7 +111,8 @@
                                 <option value="{{$sk->kd_satker}}">{{$sk->nm_satker}}</option>
                                 @endforeach
                                 @else
-                                <option value="{{$auth->det_user->kd_satker}}" selected>{{$auth->det_user->satker->nm_satker}}</option>
+                                <option value="">--PILIH SATUAN KERJA--</option>
+                                <option value="{{$auth->det_user->kd_satker}}">{{$auth->det_user->satker->nm_satker}}</option>
                                 @endif
                             </select>
                         </div>
@@ -152,7 +174,7 @@
         format: "yyyy",
         viewMode: "years",
         minViewMode: "years",
-        autoclose: true //to close picker once year is selected
+        autoclose: true
     });
 
     $('#form-import').submit(function() {
@@ -261,48 +283,53 @@
         "@endif"
     })
 
-    // handle execution import csv 
-    const fileList = document.getElementById('fileList');
-    const fileInput = document.getElementById('fileInput');
-    const kdSatkerInput = document.getElementById('kd_satker');
-    const thangInput = document.getElementById('thang');
-    let files = [];
+    function fillKdDokumen(kd_dokumen, kd_satker, tahun) {
+        var kdDokumenInput = document.getElementById('kd_dokumen');
+        var kdSatkerInput = document.getElementById('kd_satker');
+        var thangInput = document.getElementById('thang');
 
-    function selectFile() {
-        fileInput.click();
+        kdDokumenInput.value = kd_dokumen;
+        kdSatkerInput.value = kd_satker;
+        thangInput.value = tahun;
+
+        kdSatkerInput.disabled = true;
+        thangInput.disabled = true;
     }
 
-    fileInput.addEventListener('change', function() {
-        if (fileInput.files.length > 0) {
-            files.push(fileInput.files[0]);
-            const fileItem = document.createElement('div');
-            fileItem.textContent = fileInput.files[0].name;
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Delete';
-            deleteButton.classList.add('btn', 'btn-sm', 'btn-outline-danger', 'ml-2', 'mb-2');
-            deleteButton.onclick = function() {
-                files = files.filter(file => file !== fileInput.files[0]);
-                fileList.removeChild(fileItem);
-            };
-            fileItem.appendChild(deleteButton);
-            fileList.appendChild(fileItem);
-            fileInput.value = '';
-        }
-    });
+    function removeKdDokumen() {
+        var kdDokumenInput = document.getElementById('kd_dokumen');
+        var kdSatkerInput = document.getElementById('kd_satker');
+        var thangInput = document.getElementById('thang');
 
+        kdDokumenInput.value = "";
+        kdSatkerInput.value = "";
+        thangInput.value = "";
+
+        kdSatkerInput.disabled = false;
+        thangInput.disabled = false;
+    }
+
+    // handle execution import csv 
     function uploadFiles() {
-        if (files.length > 0 && files.length == 7) {
+        const fileInput = document.getElementById('fileInput');
+        const kdSatkerInput = document.getElementById('kd_satker');
+        const thangInput = document.getElementById('thang');
+        const jenisInput = document.getElementById('jenis');
+        const kdDokumenInput = document.getElementById('kd_dokumen');
+
+        if (fileInput.value !== "" && thangInput.value !== "" && kdSatkerInput.value !== "" && jenisInput.value !== "") {
             const formData = new FormData();
-            for (let i = 0; i < files.length; i++) {
-                formData.append('import-data', files[i]);
-            }
+            formData.append('import-data', fileInput.files[0]);
             formData.append('thang', thangInput.value);
             formData.append('kd_satker', kdSatkerInput.value);
+            formData.append('jenis', jenisInput.value);
 
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+            if (kdDokumenInput.value !== "") {
+                formData.append('kd_dokumen', kdDokumenInput.value);
+            }
 
             const headers = new Headers({
-                'X-CSRF-TOKEN': csrfToken,
+                'X-CSRF-TOKEN': CSRF_TOKEN,
             });
 
             $('#impSubmit').attr('disabled', true)
@@ -319,13 +346,21 @@
                         if (result) {
                             location.reload();
                         }
+                    } else if (data.status == "Updated") {
+                        const result = confirm("Data berhasil di update!");
+                        if (result) {
+                            location.reload();
+                        }
+                    } else if (data.status == "Invalid file type") {
+                        const result = confirm("Format file tidak valid!");
+                        if (result) {
+                            location.reload();
+                        }
                     }
                 })
                 .catch(error => console.error('Error:', error));
-        } else if (files.length <= 7 || files.length <= 0) {
-            alert("Silahkan pilih file anda, minimal 7 files yang sudah ditentukan.")
-        } else if (thangInput.value == "" || thangInput.value == null || kdSatkerInput.value == "" || kdSatkerInput.value == null) {
-            alert("Silahkan isi semua form!")
+        } else {
+            alert("Pastikan mengisi semua form!");
         }
     }
 </script>

@@ -20,6 +20,8 @@ use App\Transfer;
 use PDF;
 use Dompdf\Dompdf;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 class HomeController extends Controller
 {
@@ -180,10 +182,17 @@ class HomeController extends Controller
         if (Auth::user()->role != 1) {
             $query = $query->where('kd_satker', $kd_satker);
         }
-        $data['import'] = $query->where('import_log.status', '!=', 0)->orderBy('import_log.created_at', 'desc')->get(['import_log.*', 'users.fullname']);
+
+        $data['import'] = $query->where('import_log.status', '!=', 0)
+            ->orderBy('import_log.created_at', 'desc')
+            ->selectRaw('import_log.*, users.fullname, COUNT(import_log.kd_dokumen) as kd_dokumen_count, GROUP_CONCAT(import_log.jenis) as jenis_files')
+            ->groupBy('import_log.kd_dokumen')
+            ->get();
+
         $title = (Auth::user()->role != 3) ? 'Upload RKAK/L' : 'RKAK/L';
         $data['title'] = isset($id) ? 'Pengajuan' : $title;
         $go = isset($id) ? view('rkakl.index', $data) : view('rkakl.addrkakl', $data);
+
         return $go;
     }
 
@@ -761,28 +770,56 @@ class HomeController extends Controller
     public function import(Request $req)
     {
         $user = Auth::user();
+
         $file = $req->file('import-data');
-        $ext = pathinfo($file->getClientOriginalName(), PATHINFO_EXTENSION);
-        $nama_file = $file->getClientOriginalName();
+        $fileName = $file->storeAs('file_import', 'temp_file.' . $file->getClientOriginalExtension(), 'public');
+        $filePath = storage_path('app/public/' . $fileName);
 
-        $dir = 'file_import';
-        $file->move($dir, $nama_file);
-        Excel::import(new ExcelImportRKAKL, public_path('/' . $dir . '/' . $nama_file));
+        $isJenisExisted = ImportLog::isJenisUniqueForKdDokumen($req->kd_dokumen, $req->jenis);
 
-        $rkakl = Modelrkakl::where('id_import', $this->kode())->get();
-        $this->mapping($rkakl);
+        if ($file->getClientOriginalExtension() == 'csv') {
+            if (filesize($filePath) > 0) {
+                $csvContent = $this->readCsvFileToString($filePath);
+            } else {
+                $csvContent = "";
+            }
 
-        $log = new ImportLog;
-        $log->id = $this->kode();
-        $log->kd_satker = $req->kd_satker;
-        $log->admin = $user->id;
-        $log->thang = $req->thang;
-        $log->status = 1;
-        $log->updated_from = 0;
-        $log->save();
+            if ($isJenisExisted !== true) {
+                $updateLog = ImportLog::findOrFail($isJenisExisted);
+                $updateLog->isi_file = $csvContent;
+                $updateLog->save();
 
-        return response()->json(['status' => "Imported"]);
+                Storage::delete($fileName);
+                return response()->json(['status' => "Updated"]);
+            } else {
+                $log = new ImportLog;
+                $log->id = $this->kode();
+                $log->kd_satker = $req->kd_satker;
+                if ($req->kd_dokumen !== "") {
+                    $jumlahData = ImportLog::countRecords($req->kd_dokumen);
+                    if ($jumlahData > 0 && $jumlahData < 7) {
+                        $log->kd_dokumen = $req->kd_dokumen;
+                    } else {
+                        $log->kd_dokumen = $this->kode();
+                    }
+                }
+                $log->admin = $user->id;
+                $log->thang = $req->thang;
+                $log->status = 1;
+                $log->jenis = $req->jenis;
+                $log->isi_file = $csvContent;
+                $log->updated_from = 0;
+                $log->save();
+
+                Storage::delete($fileName);
+                return response()->json(['status' => "Imported"]);
+            }
+        } else {
+            Storage::delete($fileName);
+            return response()->json(['status' => "Invalid file type"]);
+        }
     }
+
 
     public function updateRkakl(Request $request)
     {
@@ -869,5 +906,11 @@ class HomeController extends Controller
         $kode = (int) $kode + 1;
         $incrementKode = $kode;
         return $incrementKode;
+    }
+
+    public function readCsvFileToString($filePath)
+    {
+        $csvString = file_get_contents($filePath);
+        return $csvString;
     }
 }
