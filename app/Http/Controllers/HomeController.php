@@ -15,6 +15,7 @@ use App\Cart_spj;
 use App\Cart_spj_detail;
 use App\Satker;
 use App\ImportLog;
+use App\ImportLogDetail;
 use App\Jenis;
 use App\Transfer;
 use PDF;
@@ -778,18 +779,25 @@ class HomeController extends Controller
         $isJenisExisted = ImportLog::isJenisUniqueForKdDokumen($req->kd_dokumen, $req->jenis);
 
         if ($file->getClientOriginalExtension() == 'csv') {
-            if (filesize($filePath) > 0) {
-                $csvContent = $this->readCsvFileToString($filePath);
-            } else {
-                $csvContent = "";
-            }
 
             if ($isJenisExisted !== true) {
-                $updateLog = ImportLog::findOrFail($isJenisExisted);
-                $updateLog->isi_file = $csvContent;
-                $updateLog->save();
+                ImportLogDetail::where('import_log_id', $isJenisExisted)->delete();
+                if (filesize($filePath) > 0) {
+                    $fileHandle = fopen($filePath, "r");
 
-                Storage::delete($fileName);
+                    if ($fileHandle !== false) {
+                        while (($data = fgetcsv($fileHandle, 1000, ",")) !== false) {
+                            $isi_baris = $data[0];
+
+                            ImportLogDetail::create([
+                                'import_log_id' => $isJenisExisted,
+                                'value' => $isi_baris
+                            ]);
+                        }
+
+                        fclose($fileHandle);
+                    }
+                }
                 return response()->json(['status' => "Updated"]);
             } else {
                 $log = new ImportLog;
@@ -807,9 +815,27 @@ class HomeController extends Controller
                 $log->thang = $req->thang;
                 $log->status = 1;
                 $log->jenis = $req->jenis;
-                $log->isi_file = $csvContent;
                 $log->updated_from = 0;
                 $log->save();
+
+                $import_log_id = $log->id;
+
+                if (filesize($filePath) > 0) {
+                    $fileHandle = fopen($filePath, "r");
+
+                    if ($fileHandle !== false) {
+                        while (($data = fgetcsv($fileHandle, 1000, ",")) !== false) {
+                            $isi_baris = $data[0];
+
+                            ImportLogDetail::create([
+                                'import_log_id' => $import_log_id,
+                                'value' => $isi_baris
+                            ]);
+                        }
+
+                        fclose($fileHandle);
+                    }
+                }
 
                 Storage::delete($fileName);
                 return response()->json(['status' => "Imported"]);
@@ -818,8 +844,60 @@ class HomeController extends Controller
             Storage::delete($fileName);
             return response()->json(['status' => "Invalid file type"]);
         }
+
+        // $file = $req->file('import-data');
+        // $fileName = $file->storeAs('file_import', 'temp_file.' . $file->getClientOriginalExtension(), 'public');
+        // $filePath = storage_path('app/public/' . $fileName);
+
+        // $fileHandle = fopen($filePath, "r");
+
+        // if ($fileHandle !== false) {
+        //     while (($data = fgetcsv($fileHandle, 1000, ",")) !== false) {
+        //         $isi_baris = $data[0];
+
+        //         ImportLogDetail::create([
+        //             'import_log_id' => 8,
+        //             'value' => $isi_baris
+        //         ]);
+        //     }
+
+        //     fclose($fileHandle);
+        // }
     }
 
+    public function importLawas(Request $req)
+    {
+        $user = Auth::user();
+        $file = $req->file('import-data');
+        $ext = pathinfo($file->getClientOriginalName(), PATHINFO_EXTENSION);
+        $nama_file = $file->getClientOriginalName();
+
+        if ($ext == "xls" || $ext == "xlsx") {
+            $dir = 'file_import';
+            $file->move($dir, $nama_file);
+            Excel::import(new ExcelImportRKAKL, public_path('/' . $dir . '/' . $nama_file));
+
+            $rkakl = Modelrkakl::where('id_import', $this->kode())->get();
+            $this->mapping($rkakl);
+
+            $log = new ImportLog;
+            $log->id = $this->kode();
+            $log->kd_satker = $req->kd_satker;
+            $log->admin = $user->id;
+            $log->thang = $req->thang;
+            $log->status = 1;
+            $log->updated_from = 0;
+            $log->save();
+
+            $return = [];
+            $return['stsImport'] = true;
+            $return['msg'] = "Berhasil import data";
+        } else {
+            $return['stsImport'] = false;
+            $return['msg'] = "This file isn't supported by the system";
+        }
+        return redirect()->back()->with($return);
+    }
 
     public function updateRkakl(Request $request)
     {
@@ -906,6 +984,13 @@ class HomeController extends Controller
         $kode = (int) $kode + 1;
         $incrementKode = $kode;
         return $incrementKode;
+    }
+
+    public function getImportLog()
+    {
+        $importLogs = ImportLog::all();
+
+        return response()->json(['data' => $importLogs], 200);
     }
 
     public function readCsvFileToString($filePath)

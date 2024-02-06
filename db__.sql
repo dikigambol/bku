@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Waktu pembuatan: 17 Jan 2024 pada 04.50
+-- Waktu pembuatan: 06 Feb 2024 pada 05.00
 -- Versi server: 10.4.24-MariaDB
 -- Versi PHP: 7.4.29
 
@@ -247,16 +247,27 @@ CREATE TABLE `failed_jobs` (
 CREATE TABLE `import_log` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `kd_satker` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `kd_dokumen` int(100) DEFAULT NULL,
+  `kd_dokumen` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `admin` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `thang` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `jenis` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `isi_file` longtext COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `jenis` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `updated_from` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Struktur dari tabel `import_log_detail`
+--
+
+CREATE TABLE `import_log_detail` (
+  `id` int(11) NOT NULL,
+  `import_log_id` int(200) NOT NULL,
+  `value` varchar(200) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -612,6 +623,18 @@ INSERT INTO `users` (`id`, `id_detuser`, `fullname`, `name`, `role`, `email`, `e
 --
 
 --
+-- Indeks untuk tabel `import_log`
+--
+ALTER TABLE `import_log`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indeks untuk tabel `import_log_detail`
+--
+ALTER TABLE `import_log_detail`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indeks untuk tabel `satker`
 --
 ALTER TABLE `satker`
@@ -627,6 +650,18 @@ ALTER TABLE `users`
 --
 -- AUTO_INCREMENT untuk tabel yang dibuang
 --
+
+--
+-- AUTO_INCREMENT untuk tabel `import_log`
+--
+ALTER TABLE `import_log`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+-- AUTO_INCREMENT untuk tabel `import_log_detail`
+--
+ALTER TABLE `import_log_detail`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=89;
 
 --
 -- AUTO_INCREMENT untuk tabel `satker`

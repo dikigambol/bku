@@ -23,6 +23,7 @@ Auth::routes();
 
 Route::get('/', 'HomeController@index')->name('home');
 Route::post('rkakl/import', 'HomeController@import')->name('import');
+Route::get('/all-log-import', 'HomeController@getImportLog')->name('getImportLog');
 Route::post('rkakl/edit', 'HomeController@updateRkakl')->name('editRkakl');
 Route::post('/getRkakl', 'HomeController@filRkakl')->name('getRkakl');
 Route::get('/idxRkakl', 'HomeController@rkakl')->name('idxRkakl');
