@@ -186,15 +186,31 @@ class HomeController extends Controller
 
         $data['import'] = $query->where('import_log.status', '!=', 0)
             ->orderBy('import_log.created_at', 'desc')
-            ->selectRaw('import_log.*, users.fullname, COUNT(import_log.kd_dokumen) as kd_dokumen_count, GROUP_CONCAT(import_log.jenis) as jenis_files')
+            ->selectRaw('import_log.kd_dokumen, import_log.kd_satker, import_log.thang, import_log.created_at, 
+            users.fullname, COUNT(import_log.kd_dokumen) as kd_dokumen_count, GROUP_CONCAT(import_log.id) as jenis_files')
             ->groupBy('import_log.kd_dokumen')
             ->get();
 
+        foreach ($data['import'] as $datas) {
+            $datas->jenis_files = explode(',', $datas->jenis_files);
+            $countsArr = [];
+
+            foreach ($datas->jenis_files as $id) {
+                $importLog = ImportLog::find($id);
+
+                if ($importLog) {
+                    $nama_jenis = $importLog->jenis;
+                    $counts_jenis = ImportLogDetail::where('import_log_id', $id)->count();
+                    $countsArr[$id] = $nama_jenis . " - " . $counts_jenis . " baris";
+                }
+            }
+            $datas->jenis_files = implode(', ', $countsArr);
+        }
+
         $title = (Auth::user()->role != 3) ? 'Upload RKAK/L' : 'RKAK/L';
         $data['title'] = isset($id) ? 'Pengajuan' : $title;
-        $go = isset($id) ? view('rkakl.index', $data) : view('rkakl.addrkakl', $data);
 
-        return $go;
+        return view('rkakl.addrkakl', $data);
     }
 
     public function getAvail($kd_satker, $id_jenis)
